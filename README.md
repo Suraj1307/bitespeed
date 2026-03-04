@@ -1,27 +1,101 @@
 # Bitespeed Identity Reconciliation API
 
 ## Project Overview
-This service solves the Bitespeed identity reconciliation problem. It accepts `email` and/or `phoneNumber` and returns a consolidated identity with a stable primary contact and linked secondary contacts.
 
-## Tech Stack
-- Node.js
-- Express
-- TypeScript
-- Prisma ORM
-- PostgreSQL
-- Render (deployment)
+This service solves the **Bitespeed Identity Reconciliation problem**.
 
-## API Endpoints
-- `GET /`
-  - Returns service metadata and available routes.
-- `GET /health`
-  - Returns service status and database connectivity.
-- `POST /identify`
-  - Reconciles identities and returns consolidated contact data.
+The API accepts an `email` and/or `phoneNumber` and returns a **consolidated identity** containing:
 
-## Example Request/Response
-### Request
-`POST /identify`
+* A stable **primary contact**
+* All associated **secondary contacts**
+* Aggregated **emails and phone numbers**
+
+The service ensures that **the oldest contact remains the primary identity** while new related contacts are linked as secondaries.
+
+---
+
+# Tech Stack
+
+* **Node.js**
+* **Express.js**
+* **TypeScript**
+* **Prisma ORM**
+* **PostgreSQL**
+* **Render (Cloud Deployment)**
+* **Jest + Supertest (Testing)**
+
+---
+
+# Live API
+
+Base URL
+
+```
+https://bitespeed-identity-syw5.onrender.com
+```
+
+### Health Check
+
+```
+GET /health
+```
+
+Example:
+
+```
+https://bitespeed-identity-syw5.onrender.com/health
+```
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-03-04T22:02:54.828Z",
+  "uptime": 448.34,
+  "database": "connected"
+}
+```
+
+---
+
+# API Endpoints
+
+## Root Endpoint
+
+```
+GET /
+```
+
+Returns API metadata and available routes.
+
+---
+
+## Health Endpoint
+
+```
+GET /health
+```
+
+Checks server and database status.
+
+---
+
+## Identity Reconciliation
+
+```
+POST /identify
+```
+
+Accepts an `email` and/or `phoneNumber` and returns the consolidated contact identity.
+
+---
+
+# Example Request
+
+```
+POST /identify
+```
 
 ```json
 {
@@ -30,103 +104,290 @@ This service solves the Bitespeed identity reconciliation problem. It accepts `e
 }
 ```
 
-### Response
+---
+
+# Example Response
+
 ```json
 {
   "contact": {
     "primaryContactId": 1,
-    "emails": ["test@example.com"],
-    "phoneNumbers": ["1234567890"],
+    "emails": [
+      "test@example.com"
+    ],
+    "phoneNumbers": [
+      "1234567890"
+    ],
     "secondaryContactIds": []
   }
 }
 ```
 
-## Identity Reconciliation Logic
-The algorithm handles four required scenarios:
+---
 
-1. No existing contact match:
-- Creates a new `primary` contact.
+# Identity Reconciliation Logic
 
-2. Existing identity match:
-- Returns the existing consolidated identity.
+The algorithm handles the four required scenarios defined in the assignment.
 
-3. Existing identity with new email/phone:
-- Creates a new `secondary` contact linked to the primary.
+### 1. No Existing Contact
 
-4. Two primaries become connected by a new request:
-- Oldest primary stays primary.
-- Newer primary is demoted to secondary and linked to the oldest primary.
-- Existing secondaries are re-parented to the oldest primary.
+If no contact exists with the provided email or phone number:
 
-Response rules:
-- `primaryContactId` is the oldest primary in the cluster.
-- `emails[0]` is the primary email (if present).
-- `phoneNumbers[0]` is the primary phone (if present).
-- `secondaryContactIds` contains all linked secondaries.
+* A new **primary contact** is created.
 
-## Project Architecture
-- Controller layer: validates request payload and returns API responses.
-  - `src/controllers/identifyController.ts`
-- Service layer: contains reconciliation algorithm and business rules.
-  - `src/services/identityService.ts`
-- Database layer: Prisma client + schema/migrations.
-  - `src/utils/prismaClient.ts`
-  - `prisma/schema.prisma`
-  - `prisma/migrations/*`
+---
 
-The reconciliation algorithm runs inside a Prisma transaction to avoid race conditions during merges and secondary creation.
+### 2. Existing Identity Found
 
-## Local Development
-1. Install dependencies:
+If a matching contact already exists:
+
+* The existing identity cluster is returned.
+
+---
+
+### 3. Partial Match (New Email or Phone)
+
+If a request matches an existing identity but introduces new information:
+
+Example
+
+Existing contact
+
+```
+email: a@example.com
+phone: 111
+```
+
+New request
+
+```
+email: b@example.com
+phone: 111
+```
+
+Result:
+
+* A **secondary contact** is created
+* Linked to the existing primary
+
+---
+
+### 4. Two Primary Contacts Become Connected
+
+Example:
+
+```
+A: email1 + phone1
+B: email2 + phone2
+C: email1 + phone2
+```
+
+Result:
+
+* Oldest contact remains **primary**
+* Newer primary becomes **secondary**
+* All secondaries are re-linked to the oldest primary
+
+---
+
+# Response Rules
+
+* `primaryContactId` → oldest primary contact
+* `emails[0]` → primary email (if present)
+* `phoneNumbers[0]` → primary phone number (if present)
+* `secondaryContactIds` → all linked secondary contacts
+
+---
+
+# Project Architecture
+
+The project follows a **layered architecture**.
+
+### Controller Layer
+
+Handles request validation and API responses.
+
+```
+src/controllers/identifyController.ts
+```
+
+---
+
+### Service Layer
+
+Contains the **identity reconciliation algorithm** and business logic.
+
+```
+src/services/identityService.ts
+```
+
+---
+
+### Database Layer
+
+Prisma ORM manages database interactions.
+
+```
+src/utils/prismaClient.ts
+prisma/schema.prisma
+prisma/migrations/*
+```
+
+All reconciliation operations run inside a **Prisma transaction** to avoid race conditions.
+
+---
+
+# Local Development
+
+### Install dependencies
+
 ```bash
 npm install
 ```
 
-2. Create environment file:
+---
+
+### Create environment file
+
 ```bash
 cp .env.example .env
 ```
 
-3. Set your database URL in `.env`.
+---
 
-4. Run migrations:
+### Configure database
+
+Set the database URL in `.env`.
+
+```
+DATABASE_URL=postgresql://user:password@localhost:5432/bitespeed
+```
+
+---
+
+### Run migrations
+
 ```bash
 npm run db:migrate:dev
 ```
 
-5. Start server:
+---
+
+### Start development server
+
 ```bash
 npm run dev
 ```
 
-## Testing
-Run integration tests (Jest + Supertest):
+Server runs on
+
+```
+http://localhost:3000
+```
+
+---
+
+# Testing
+
+Run integration tests:
+
 ```bash
 npm test
 ```
 
-Covered cases:
-- New primary creation
-- Existing identity lookup
-- Secondary creation
-- Primary merge
-- Email-only request
-- Phone-only request
+Testing tools:
 
-## Deployment (Render)
-- Build command:
-```bash
-npm install && npm run db:generate && npm run build && npm run db:migrate
+* **Jest**
+* **Supertest**
+
+Covered scenarios:
+
+* New primary creation
+* Existing identity lookup
+* Secondary contact creation
+* Primary merge
+* Email-only requests
+* Phone-only requests
+
+---
+
+# API Testing
+
+### Postman / Thunder Client
+
+Request:
+
 ```
-- Start command:
-```bash
-npm start
+POST https://bitespeed-identity-syw5.onrender.com/identify
 ```
 
-Important: keep `prisma/migrations` committed, because production uses `prisma migrate deploy`.
+Body:
 
-## Live Endpoint
-- Base URL: `https://bitespeed-identity-syw5.onrender.com`
-- Health: `https://bitespeed-identity-syw5.onrender.com/health`
-- Identify: `https://bitespeed-identity-syw5.onrender.com/identify`
+```json
+{
+  "email": "alex@example.com",
+  "phoneNumber": "5551112222"
+}
+```
+
+---
+
+### Curl Example
+
+```bash
+curl -X POST https://bitespeed-identity-syw5.onrender.com/identify \
+-H "Content-Type: application/json" \
+-d '{"email":"alex@example.com","phoneNumber":"5551112222"}'
+```
+
+---
+
+# Deployment (Render)
+
+Build Command
+
+```bash
+npm install && npm run build
+```
+
+Start Command
+
+```bash
+npx prisma migrate deploy && npm start
+```
+
+Important:
+
+Production requires **Prisma migrations to be committed** because deployment runs:
+
+```
+prisma migrate deploy
+```
+
+---
+
+# Live Endpoints
+
+Base URL
+
+```
+https://bitespeed-identity-syw5.onrender.com
+```
+
+Health
+
+```
+https://bitespeed-identity-syw5.onrender.com/health
+```
+
+Identity Reconciliation
+
+```
+https://bitespeed-identity-syw5.onrender.com/identify
+```
+
+---
+
+# Author
+
+Suraj Kumar
