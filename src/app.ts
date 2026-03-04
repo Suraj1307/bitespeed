@@ -18,6 +18,18 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
 
+app.get('/', (_req, res) => {
+  res.json({
+    service: 'Bitespeed Identity Reconciliation API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: 'GET /health',
+      identify: 'POST /identify',
+    },
+  });
+});
+
 app.use('/health', healthRouter);
 app.use('/identify', identifyRouter);
 
